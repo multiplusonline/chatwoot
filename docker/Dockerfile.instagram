@@ -1,0 +1,20 @@
+# The Instagram backport changes no dependencies. Reuse the exact release runtime.
+ARG CHATWOOT_BASE=chatwoot/chatwoot:v4.19.1@sha256:a0d571a3a2f78f4fa4b1d7c21a53309c0184068d6021b3664ab37788faef04c1
+FROM ${CHATWOOT_BASE} AS assets
+WORKDIR /app
+RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+  && npm install -g pnpm@10.2.0
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY . /app
+ARG SOURCE_SHA
+RUN test -n "$SOURCE_SHA" \
+  && bundle check \
+  && EXECJS_RUNTIME=Node SECRET_KEY_BASE=precompile_placeholder RAILS_LOG_TO_STDOUT=enabled bundle exec rake assets:precompile \
+  && printf '%s\n' "$SOURCE_SHA" > /app/.git_sha \
+  && rm -rf /app/node_modules /app/spec /app/.git /app/.github /app/tmp/cache
+
+FROM ${CHATWOOT_BASE}
+WORKDIR /app
+COPY --from=assets /app /app
+LABEL org.opencontainers.image.source="https://github.com/multiplusonline/chatwoot"
