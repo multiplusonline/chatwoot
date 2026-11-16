@@ -47,8 +47,28 @@ The patch applies cleanly and passes `git diff --check`. Ruby syntax checks pass
 
 Frontend verification: all 27 tests across the five changed spec files passed, and ESLint passed for all changed JavaScript/Vue files. These ran on available Node 25.8.1 with pnpm 10.2.0; the project targets Node 24, so production validation should use Node 24. Dependencies were installed from the frozen lockfile without lifecycle scripts. Non-fatal warnings concerned Browserslist data and an existing package source map.
 
-## Production backport
+## Deployment progress — 2026-11-16
 
-Production branch: `deploy/instagram-v4.19.1`, based on the deployed release `caab07a8f00032d5205b5a5d7e2eb0ba2f3d2d82`. This avoids ten unrelated migrations present in develop. The only compatibility change to the imported feature is using the release's Active Record migration version 7.2 rather than 8.0. InstallationConfig and schema merge conflicts retain release behavior and add only the Instagram fields/validation. CI tests upgrading the release schema with PostgreSQL 12 to match the live database.
+Production target is now `deploy/instagram-v4.19.1` at `937607cc82d7335398f81873b4793e988aef4e72`, based on the deployed release. It contains only the Instagram migration; it does not include the ten unrelated develop migrations. The migration uses Active Record 7.2 for release compatibility. The develop-based feature branch remains available separately.
 
-A one-time database dump was created and its archive catalog checked on 2026-11-16 at `/var/lib/postgresql/data/manual-backups/chatwoot-pre-instagram-20261116T140434Z.dump` (425 KB, mode 600). This is on the existing database volume, not an off-server disaster recovery backup. No recurring backup schedule was created.
+Production-target validation passed: 113 backend examples, 27 frontend tests, lint, and loading the v4.19.1 schema then migrating it on PostgreSQL 12. Build: https://github.com/multiplusonline/chatwoot/actions/runs/43882326786 . Image publication succeeded. Verified anonymous registry access and pinned image: `ghcr.io/multiplusonline/chatwoot:instagram-937607cc82d7335398f81873b4793e988aef4e72@sha256:3314152083e6778970d44114d54a8d7718c3b0781527fd0dda89dda0a75795c8`. The older develop image build was cancelled intentionally.
+
+One-time database backup created and archive catalog verified: `/var/lib/postgresql/data/manual-backups/chatwoot-pre-instagram-20261116T140434Z.dump` (425 KB, mode 600). This is on the database volume, not off-server storage. No recurring schedule was created.
+
+Coolify compose now supplies the three Active Record encryption settings to both Rails and Sidekiq through generated, reusable `SERVICE_PASSWORD_64_CWENCRYPTPRIMARY`, `SERVICE_PASSWORD_64_CWENCRYPTDETERMINISTIC` and `SERVICE_PASSWORD_64_CWENCRYPTSALT` variables. No secret values are recorded here. Both image references are saved to the pinned custom image. Deployment completed. Runtime revision is `937607cc82d7335398f81873b4793e988aef4e72`; no pending migrations; both new Instagram columns exist; all three encryption variables are present. Rails and Sidekiq report healthy, and the public API returns HTTP 200. PostgreSQL and Redis images were not pulled or upgraded.
+
+Meta configuration **Chatwoot Instagram Login**, ID `1698393818310865`, is created with Instagram assets and exactly `instagram_basic` and `instagram_manage_messages`. Token lifetime is 60 days. Both permissions are ready for testing; Advanced Access approval is not established. OAuth redirect URI is saved and selected. Final account authorization, webhook verification, and live messaging remain outstanding.
+
+Rollback image: `chatwoot/chatwoot:v4.19.1@sha256:a0d571a3a2f78f4fa4b1d7c21a53309c0184068d6021b3664ab37788faef04c1`.
+
+Unified Login settings are saved in Chatwoot, reusing the existing Channel app secret privately. Meta accepted the Instagram webhook verification and subscriptions for `messages`, `message_reactions`, and `messaging_seen` (v27.0). The Meta messages sample delivery test succeeded. This verifies transport, not live inbox messaging. Authorization for `multiplusonline` in the Multiplus BV portfolio succeeded, but creating the inbox is blocked by Meta account subscription (details below).
+
+## Remaining Meta blocker — 2026-11-16 14:50 UTC
+
+No Instagram inbox was created. Meta returns HTTP 400, GraphMethodException code 100/subcode 33, for POST `/17841429480492119/subscribed_apps`. The same failure was reproduced directly using Meta’s documented form-body request, outside the Chatwoot service. GET of the account succeeds and returns username `multiplusonline`. Token debugging confirms app ID `1812535373408044`, valid SYSTEM_USER token, and granted `instagram_basic` and `instagram_manage_messages` scopes. No credentials are included here.
+
+Changed Instagram API version from the inherited v22.0 to v27.0 and retried; same subscription error. Wichard is an app Administrator. Instagram Testers list is empty; no tester invitation was sent. Advanced Access remains unverified; the two permissions are ready for testing. Investigate tester eligibility/Instagram message access and Meta app access restrictions; the exact cause of code 100/33 is not established. Do not bypass subscription failure or create a working-looking inbox manually.
+
+Direct POST failure trace ID: `ATRp_oPVgvYGeYSk1SiKey6o` (14:49 UTC). Use this, app/config IDs and the account ID for Meta support if eligibility checks do not resolve the error. Live Instagram inbound/outbound messaging is NOT verified.
+
+Existing Messenger inbox 1 remains present, its page API responds HTTP 200, and `reauthorization_required` is false. This is a connection health check, not a new send/receive test. WhatsApp settings remain untouched.
