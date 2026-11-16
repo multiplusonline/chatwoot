@@ -47,7 +47,7 @@ jobs:
       - run: bundle exec rails db:create db:schema:load
       - name: Run changed backend specs and lint
         run: |
-          git diff --name-only aed04e65f5c088d42c2b85304293e47367b6fe96 HEAD -- '*.rb' | xargs bundle exec rubocop
+          git diff --name-only aed04e65f5c088d42c2b85304293e47367b6fe96 HEAD -- '*.rb' | xargs bundle exec rubocop --force-exclusion
           git diff --name-only aed04e65f5c088d42c2b85304293e47367b6fe96 HEAD -- 'spec/*_spec.rb' | xargs bundle exec rspec
       - name: Run changed frontend specs and lint
         run: |
